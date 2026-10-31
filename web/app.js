@@ -83,11 +83,11 @@ function setCaption(text) {
   els.card.querySelector("#card-caption").textContent = text;
 }
 
-function showClip(cam, { loop = false } = {}) {
+function showClip(cam, { loop = false, from = 0 } = {}) {
   onScreen = cam.id;
-  els.card.querySelector("#card-video").innerHTML = `<video class="feed-video" src="${cam.video}" autoplay muted playsinline ${loop ? "loop" : ""}></video>`;
+  els.card.querySelector("#card-video").innerHTML = `<video class="feed-video" src="${cam.video}#t=${from}" autoplay muted playsinline ${loop ? "loop" : ""}></video>`;
   video = els.card.querySelector("video");
-  video.started = performance.now();
+  video.started = performance.now() - from * 1000;
   return video;
 }
 
@@ -147,40 +147,29 @@ function ready() {
   els.card.querySelector(".play-overlay").onclick = goLive;
 }
 
-// The camera Gemma is still deciding on, which stays on screen (looping) until it answers.
-function pendingCamera(i) {
-  if (!live) return null;
-  const answered = new Set(chase.events.map((e) => e.camera));
-  return chase.cameras.find((c) => !answered.has(c.id)) ?? (i === 0 ? chase.cameras[0] : null);
+// Waits until step i is known and its clip reaches the moment Gemma flagged. Returns false if there is none.
+// Gemma watches in the background; nothing plays until it calls something.
+function waiting() {
+  onScreen = null;
+  video = null;
+  setHead("Watching", `${chase.cameras.length} cameras`);
+  setCaption("");
+  setStatus(`Gemma 4 is watching ${chase.cameras.length} cameras…`);
+  els.card.querySelector("#card-video").innerHTML = `
+    <div class="card-waiting"><span class="feeds-calm-dot"></span>Gemma 4 is watching ${chase.cameras.length} cameras. Nothing yet.</div>`;
 }
 
-// Waits until step i is known and its clip reaches the moment Gemma flagged. Returns false if there is none.
-async function reachStep(i, id) {
-  while (id === run) {
-    const step = steps[i];
-    if (!step) {
-      const cam = pendingCamera(i);
-      if (!cam) return false;
-      if (onScreen !== cam.id) {
-        showClip(cam, { loop: true });
-        setCaption(i === 0 ? `${cam.name} · Gemma 4 is checking for a crime…` : `${cam.name} · Gemma 4 is looking for the suspect…`);
-        setStatus(i === 0 ? `Gemma 4 is checking ${cam.name}…` : `Looking for the suspect on ${cam.name}…`, i > 0);
-      }
-      await frame();
-      continue;
-    }
-    const cam = camera(step.camera);
-    if (onScreen !== cam.id) showClip(cam);
-    // Gemma answered while this clip was already past the moment: back up to just before it.
-    if (clipTime(video) > step.offset_s + 0.3) {
-      video.currentTime = Math.max(step.offset_s - 2, 0);
-      video.started = performance.now() - video.currentTime * 1000;
-    }
-    while (id === run && clipTime(video) < step.offset_s) await frame();
-    video.loop = false;
-    return id === run;
+// Waits until Gemma has an answer for step i. Returns false if there won't be one.
+async function answerFor(i, id) {
+  let asked = false;
+  while (id === run && !steps[i]) {
+    const answered = new Set(chase.events.map((e) => e.camera));
+    if (!live || (i > 0 && chase.cameras.every((c) => answered.has(c.id)))) return false;
+    if (i > 0 && !asked) setStatus("Looking for the suspect on the next cameras…", true);
+    asked = true;
+    await frame();
   }
-  return false;
+  return id === run;
 }
 
 // The clip just reached the moment Gemma flagged: the crime is called, or the suspect's path lights up.
@@ -207,10 +196,23 @@ function detect(i) {
 
 async function follow() {
   const id = run;
+  waiting();
   for (let i = 0; ; i++) {
-    if (!(await reachStep(i, id))) break;
-    detect(i);
-    const length = camera(steps[i].camera).duration || 5;
+    if (!(await answerFor(i, id))) break;
+    const step = steps[i];
+    const cam = camera(step.camera);
+    if (i === 0) {
+      // The crime is called: pull it up, starting just before the moment Gemma flagged.
+      detect(0);
+      showClip(cam, { from: Math.max(step.offset_s - 2, 0) });
+    } else {
+      // The next camera, from just before the suspect appears; his path lights up when he's in frame.
+      showClip(cam, { from: Math.max(step.offset_s - 1.5, 0) });
+      while (id === run && clipTime(video) < step.offset_s) await frame();
+      if (id !== run) return;
+      detect(i);
+    }
+    const length = cam.duration || 5;
     while (id === run && clipTime(video) < length) await frame();
     if (id !== run) return;
   }
@@ -247,8 +249,15 @@ async function replay() {
   els.gemma.hidden = true;
   const data = await loadSaved();
   Object.assign(chase, data);
-  steps = data.events.filter((e) => e.kind !== "clear");
+  const saved = data.events.filter((e) => e.kind !== "clear");
+  live = true; // hold the saved answers back briefly, as if Gemma were still watching
   follow();
+  const id = run;
+  setTimeout(() => {
+    if (id !== run) return;
+    steps = saved;
+    live = false;
+  }, 2500);
 }
 
 // ---------- live: Gemma's steps stream in, and the chase follows its answers ----------

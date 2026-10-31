@@ -327,3 +327,15 @@ button:disabled { opacity: 0.5; cursor: default; }
   font-size: 28px;
 }
 .play-overlay:hover { background: var(--text); color: var(--ink); }
+
+.card-waiting {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  aspect-ratio: 16 / 9;
+  max-height: 40vh;
+  color: var(--muted);
+  font-size: var(--fs-small);
+  background: var(--ink);
+}
