@@ -1,0 +1,69 @@
+{
+  "models": [
+    "gemma-4-31b-it",
+    "gemma-4-26b-a4b-it"
+  ],
+  "suspect": "red and black striped shirt, blue jeans, slim build, dark hair",
+  "cameras": [
+    {
+      "id": "cam1",
+      "name": "Camera 1",
+      "source": "videos/IMG_7493.mov",
+      "video": "videos/cam1.mp4",
+      "lat": 35.7726,
+      "lng": -78.675,
+      "duration": 10.905
+    },
+    {
+      "id": "cam2",
+      "name": "Camera 2",
+      "source": "videos/IMG_7494.mov",
+      "video": "videos/cam2.mp4",
+      "move": [
+        4e-05,
+        3e-05
+      ],
+      "lat": 35.772439999999996,
+      "lng": -78.67507,
+      "duration": 4.635
+    },
+    {
+      "id": "cam3",
+      "name": "Camera 3",
+      "source": "videos/IMG_7495.mov",
+      "video": "videos/cam3.mp4",
+      "lat": 35.7725,
+      "lng": -78.6752,
+      "duration": 3.801667
+    }
+  ],
+  "events": [
+    {
+      "camera": "cam1",
+      "offset_s": 4.5,
+      "time": "2026-10-31T12:23:57.500000-04:00",
+      "kind": "crime",
+      "type": "assault",
+      "text": "A person in a red and black striped shirt shoved another person to the ground and then fled the scene.",
+      "direction": "left"
+    },
+    {
+      "camera": "cam2",
+      "offset_s": 1.5,
+      "time": "2026-10-31T12:25:01.500000-04:00",
+      "kind": "sighting",
+      "confidence": 1,
+      "text": "The suspect is running across the street towards the camera.",
+      "direction": "towards the camera"
+    },
+    {
+      "camera": "cam3",
+      "offset_s": 1.0,
+      "time": "2026-10-31T12:25:23-04:00",
+      "kind": "sighting",
+      "confidence": 1.0,
+      "text": "The suspect is running along the sidewalk.",
+      "direction": "left"
+    }
+  ]
+}

@@ -205,19 +205,6 @@ cython_debug/
 # Temporary file for partial code execution
 tempCodeRunnerFile.py
 
-# Recorded demos and generated observations stay local.
-video/
-videos/
-outputs/
-*.mp4
-*.mov
-*.MOV
-*.MP4
-*.avi
-*.webm
-*.mkv
-.DS_Store
-
 # Ruff stuff:
 .ruff_cache/
 
@@ -231,3 +218,5 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+.DS_Store

@@ -1,0 +1,341 @@
+/* Same tokens as the Clarity dashboard. */
+:root {
+  --ink: #0E1A24;
+  --panel: #132230;
+  --rule: #24384A;
+  --text: #E6EDF2;
+  --muted: #8EA3B3;
+  --chase-1: #FFB020;
+  --alert: #FF6B5A;
+  --ok: #46C38A;
+
+  --font-ui: 'Public Sans', system-ui, 'Segoe UI', sans-serif;
+  --font-sign: 'Barlow Semi Condensed', 'Public Sans', system-ui, sans-serif;
+  --fs-body: 15px;
+  --fs-small: 13px;
+  --fs-title: 18px;
+
+  --radius-card: 6px;
+  --radius-button: 4px;
+  --header-h: 48px;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+
+body {
+  background: var(--ink);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: var(--fs-body);
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+  font-variant-numeric: tabular-nums;
+}
+
+button {
+  font: inherit;
+  font-size: var(--fs-small);
+  font-weight: 600;
+  color: var(--text);
+  background: transparent;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-button);
+  padding: 4px 12px;
+  cursor: pointer;
+}
+button:disabled { opacity: 0.5; cursor: default; }
+
+.app { height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+/* ---------- header ---------- */
+.header {
+  flex: 0 0 var(--header-h);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--rule);
+  min-width: 0;
+}
+.header-brand { display: inline-flex; align-items: center; gap: 12px; }
+.header-brand svg { display: block; }
+.header-wordmark {
+  font-family: 'Barlow', var(--font-ui);
+  font-weight: 600;
+  font-size: 20px;
+  letter-spacing: 0.32em;
+  background: linear-gradient(90deg, #A9DDFB 0%, #EAF6FF 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.header-site { color: var(--muted); white-space: nowrap; }
+.header-spacer { flex: 1; }
+.header-summary { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; color: var(--muted); }
+.header-summary.is-alert { color: var(--alert); font-weight: 600; }
+.btn-live { background: var(--text); border-color: var(--text); color: var(--ink); }
+
+/* ---------- layout ---------- */
+.layout {
+  flex: 1 1 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 60fr) minmax(0, 40fr);
+  min-height: 0;
+}
+.slot { min-height: 0; min-width: 0; overflow: hidden; position: relative; }
+.right {
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  border-left: 1px solid var(--rule);
+  min-height: 0;
+}
+
+/* ---------- map ---------- */
+.whoopty-map { position: absolute; inset: 0; }
+.whoopty-map.leaflet-container { background: var(--ink); font-family: var(--font-ui); font-size: var(--fs-small); }
+.whoopty-map .leaflet-tile-pane { filter: grayscale(1) invert(1) brightness(.8) contrast(.9) hue-rotate(180deg); }
+.whoopty-map .leaflet-control-attribution {
+  background: color-mix(in srgb, var(--ink) 85%, transparent);
+  color: var(--muted);
+  font-size: 12px;
+}
+.whoopty-map .leaflet-control-attribution a { color: var(--text); text-decoration: none; }
+.whoopty-map .leaflet-bar { border: 1px solid var(--rule); border-radius: var(--radius-button); box-shadow: none; }
+.whoopty-map .leaflet-bar a { background: var(--ink); color: var(--muted); border-bottom: 1px solid var(--rule); }
+.whoopty-map .leaflet-bar a:hover { background: var(--panel); color: var(--text); }
+
+.cam-icon { background: none; border: 0; }
+.cam { position: relative; width: 100%; height: 100%; }
+.cam-dot { position: absolute; inset: 0; border-radius: 50%; background: var(--rule); border: 2px solid var(--text); }
+.cam.is-chase .cam-dot { background: var(--chase-1); }
+.cam.is-alert .cam-dot::after {
+  content: '';
+  position: absolute;
+  inset: -8px;
+  border-radius: 50%;
+  border: 2px solid var(--alert);
+}
+.cam-label {
+  position: absolute;
+  left: 22px;
+  top: 50%;
+  transform: translateY(-50%);
+  white-space: nowrap;
+  font-family: var(--font-sign);
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--muted);
+  text-shadow: 0 0 3px var(--ink), 0 0 3px var(--ink);
+}
+.cam.is-alert .cam-label { color: var(--alert); text-transform: capitalize; }
+.cam.is-chase .cam-label { color: var(--chase-1); }
+
+.map-legend {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 500;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  background: color-mix(in srgb, var(--panel) 90%, transparent);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-card);
+  font-family: var(--font-sign);
+  font-weight: 500;
+  font-size: 13px;
+  line-height: 20px;
+}
+.map-legend-row { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+.map-legend-swatch { flex: none; width: 24px; height: 20px; display: flex; align-items: center; justify-content: center; }
+.map-legend-dot { position: relative; width: 12px; height: 12px; border-radius: 50%; background: var(--rule); border: 2px solid var(--text); }
+.map-legend-dot.is-alert::after { content: ''; position: absolute; inset: -6px; border-radius: 50%; border: 2px solid var(--alert); }
+.map-legend-dot.is-chase { background: var(--chase-1); }
+.map-legend-line line { stroke: var(--chase-1); stroke-width: 4; stroke-linecap: round; }
+
+/* ---------- the crime card ---------- */
+.feeds { height: 100%; display: flex; flex-direction: column; gap: 8px; padding: 10px; overflow-y: auto; }
+.feeds-calm { display: flex; align-items: center; gap: 8px; padding: 10px 4px; color: var(--muted); font-size: var(--fs-small); }
+.feeds-calm-dot {
+  width: 8px; height: 8px; border-radius: 50%; background: var(--ok);
+  animation: feeds-watching 2.4s ease-out infinite;
+}
+@keyframes feeds-watching {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--ok) 55%, transparent); }
+  100% { box-shadow: 0 0 0 10px transparent; }
+}
+
+/* ---------- Gemma, live ---------- */
+.gemma {
+  flex: 1 1 auto;
+  min-height: 160px;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  background: var(--ink);
+  overflow: hidden;
+}
+.gemma[hidden] { display: none; }
+.gemma-head { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: var(--panel); border-bottom: 1px solid var(--rule); font-size: var(--fs-small); }
+.gemma-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); animation: feeds-watching 1.6s ease-out infinite; }
+.gemma-sub { color: var(--muted); }
+.gemma-model { font-family: var(--font-sign); color: var(--muted); }
+.gemma-log { list-style: none; margin: 0; padding: 8px 12px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; min-height: 0; flex: 1; }
+.gemma-task { border-left: 3px solid var(--rule); padding-left: 10px; font-size: var(--fs-small); animation: feed-open 180ms ease-out; }
+.gemma-task.is-running { border-color: var(--chase-1); }
+.gemma-task.is-crime { border-color: var(--alert); }
+.gemma-task.is-match { border-color: var(--ok); }
+.gemma-q { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+.gemma-spin { width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--rule); flex: none; }
+.gemma-task.is-running .gemma-spin { border-color: var(--chase-1) var(--rule) var(--rule); animation: spin .8s linear infinite; }
+.gemma-task.is-crime .gemma-spin { background: var(--alert); border-color: var(--alert); }
+.gemma-task.is-match .gemma-spin { background: var(--ok); border-color: var(--ok); }
+.gemma-think {
+  margin-top: 4px;
+  max-height: 120px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+.gemma-think:empty, .gemma-a:empty { display: none; }
+.gemma-task:not(.is-running) .gemma-think { display: none; }
+.gemma-a { margin-top: 4px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.gemma-task.is-running .gemma-a { font-family: var(--font-sign); color: var(--chase-1); }
+.gemma-task.is-crime .gemma-a { color: var(--alert); }
+.gemma-task.is-crime .gemma-a::first-letter { text-transform: uppercase; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* the suspect just reached this camera */
+.cam.is-arrive .cam-dot { animation: arrive 1.2s ease-out 1; }
+@keyframes arrive {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--chase-1) 80%, transparent); }
+  100% { box-shadow: 0 0 0 22px transparent; }
+}
+/* the stretch of path that just lit up */
+.path-flash { animation: path-flash 1.4s ease-out forwards; filter: drop-shadow(0 0 6px #FFB020); }
+@keyframes path-flash { from { stroke-opacity: .9; } to { stroke-opacity: 0; } }
+
+.watch-tile { margin: 0; border: 1px solid var(--rule); border-radius: 8px; overflow: hidden; background: #000; }
+.watch-tile video { display: block; width: 100%; aspect-ratio: 16 / 9; max-height: 40vh; object-fit: contain; }
+.watch-tile figcaption { padding: 4px 8px; background: var(--panel); font-family: var(--font-sign); font-size: var(--fs-small); color: var(--muted); }
+
+.feed {
+  --c: var(--chase-1);
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  border: 3px solid var(--c);
+  border-radius: 8px;
+  background: #000;
+  overflow: hidden;
+  box-shadow: 0 0 0 1px var(--c), 0 0 7px color-mix(in srgb, var(--c) 50%, transparent);
+  animation: feed-open 180ms ease-out;
+}
+.feed-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--panel);
+  font-size: var(--fs-body);
+  white-space: nowrap;
+}
+.feed-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--c); flex: none; }
+.feed-head strong { color: var(--c); text-transform: capitalize; }
+.feed-cam { color: var(--muted); }
+.feed-spacer { flex: 1; }
+/* Before a crime: a quiet grey card. It turns amber only when Gemma's crime call fires. */
+.feed.is-watching { --c: var(--rule); box-shadow: none; }
+.feed.is-watching .feed-dot { background: var(--ok); animation: feeds-watching 2.4s ease-out infinite; }
+.feed.is-watching .feed-head strong { color: var(--text); }
+.feed-suspect { margin: 0; padding: 0 12px 10px; background: var(--panel); color: var(--text); font-size: var(--fs-small); }
+.feed-suspect[hidden] { display: none; }
+
+.feed-video { display: block; width: 100%; aspect-ratio: 16 / 9; max-height: 40vh; object-fit: contain; background: #000; }
+.feed-caption {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  background: var(--panel);
+  font-size: var(--fs-small);
+}
+.feed-caption-text { flex: 1; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.feed-nav {
+  width: 24px; height: 24px; padding: 0;
+  border: 1px solid currentColor; border-radius: 999px;
+  font-size: 16px; line-height: 1;
+}
+.feed-nav:disabled { opacity: 0.3; }
+.feed-steps {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  padding: 6px 8px;
+  list-style: none;
+  background: var(--panel);
+}
+.feed-steps button {
+  padding: 1px 7px;
+  font-size: 12px;
+  font-weight: 400;
+  border: 1px solid var(--c);
+  border-radius: 999px;
+  opacity: 0.7;
+  white-space: nowrap;
+  animation: feed-open 220ms ease-out;
+}
+.feed-steps button:hover { opacity: 1; background: color-mix(in srgb, var(--c) 18%, transparent); }
+.feed-steps button.now { background: var(--c); color: #000; font-weight: 700; opacity: 1; }
+
+@keyframes feed-open {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (max-width: 800px) {
+  .app { height: auto; min-height: 100vh; overflow: visible; }
+  .layout { grid-template-columns: 1fr; }
+  .slot-map { height: 50vh; }
+  .right { border-left: 0; border-top: 1px solid var(--rule); }
+  .header { flex-wrap: wrap; padding: 8px 16px; height: auto; }
+  .header-site { display: none; }
+}
+
+/* Before Play: one big button over the paused first camera. */
+#card-video { position: relative; }
+.play-overlay {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 72px;
+  height: 72px;
+  padding: 0 0 0 6px;
+  border-radius: 50%;
+  border: 2px solid var(--text);
+  background: color-mix(in srgb, var(--ink) 70%, transparent);
+  color: var(--text);
+  font-size: 28px;
+}
+.play-overlay:hover { background: var(--text); color: var(--ink); }
+
+.card-waiting {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  aspect-ratio: 16 / 9;
+  max-height: 40vh;
+  color: var(--muted);
+  font-size: var(--fs-small);
+  background: var(--ink);
+}

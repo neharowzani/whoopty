@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Clarity</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@600&family=Barlow+Semi+Condensed:wght@500;600&family=Public+Sans:wght@400;600;700&display=swap">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <span class="header-brand">
+        <svg width="28" height="18" viewBox="0 0 28 18" aria-hidden="true">
+          <path d="M1 9 C6 1, 22 1, 27 9 C22 17, 6 17, 1 9 Z" fill="none" stroke="#A9DDFB" stroke-width="1.6"/>
+          <circle cx="14" cy="9" r="4" fill="#EAF6FF"/>
+        </svg>
+        <span class="header-wordmark">CLARITY</span>
+      </span>
+      <span class="header-spacer"></span>
+      <span id="status" class="header-summary">Watching</span>
+      <button id="replay">Replay chase</button>
+      <button id="live" class="btn-live">▶ Play</button>
+    </header>
+
+    <div class="layout">
+      <div class="slot slot-map">
+        <div id="map" class="whoopty-map"></div>
+        <div class="map-legend">
+          <div class="map-legend-row"><span class="map-legend-swatch"><span class="map-legend-dot is-alert"></span></span>Crime seen</div>
+          <div class="map-legend-row"><span class="map-legend-swatch"><span class="map-legend-dot is-chase"></span></span>Suspect followed</div>
+          <div class="map-legend-row"><span class="map-legend-swatch"><span class="map-legend-dot"></span></span>Camera</div>
+          <div class="map-legend-row"><span class="map-legend-swatch"><svg class="map-legend-line" width="24" height="20"><line x1="2" y1="10" x2="22" y2="10"/></svg></span>Suspect's path</div>
+        </div>
+      </div>
+      <div class="right">
+        <div class="feeds">
+          <div id="card"></div>
+          <section id="gemma" class="gemma" hidden>
+            <header class="gemma-head">
+              <span class="gemma-dot"></span>
+              <strong>Gemma 4</strong>
+              <span class="gemma-sub">thinking live</span>
+              <span class="feed-spacer"></span>
+              <span id="gemma-model" class="gemma-model"></span>
+            </header>
+            <ol id="gemma-log" class="gemma-log"></ol>
+          </section>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
