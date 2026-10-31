@@ -213,7 +213,7 @@ async function follow() {
       detect(i);
     }
     const length = cam.duration || 5;
-    while (id === run && clipTime(video) < length) await frame();
+    while (id === run && clipTime(video) < length && !video.ended) await frame();
     if (id !== run) return;
   }
   if (!steps.length) {
