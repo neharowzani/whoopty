@@ -19,7 +19,7 @@ FPS = 2
 CAMERAS = [
     {"id": "cam1", "name": "Camera 1", "source": "videos/IMG_7493.mov", "video": "videos/cam1.mp4"},
     # Phone GPS put this one a few meters west of where it was filmed: (lat, lng) nudge.
-    {"id": "cam2", "name": "Camera 2", "source": "videos/IMG_7494.mov", "video": "videos/cam2.mp4", "move": (0.00014, 0.00023)},
+    {"id": "cam2", "name": "Camera 2", "source": "videos/IMG_7494.mov", "video": "videos/cam2.mp4", "move": (0.00004, 0.00003)},
     {"id": "cam3", "name": "Camera 3", "source": "videos/IMG_7495.mov", "video": "videos/cam3.mp4"},
 ]
 
