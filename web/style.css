@@ -169,6 +169,62 @@ button:disabled { opacity: 0.5; cursor: default; }
   100% { box-shadow: 0 0 0 10px transparent; }
 }
 
+/* ---------- Gemma, live ---------- */
+.gemma {
+  flex: 1 1 auto;
+  min-height: 160px;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  background: var(--ink);
+  overflow: hidden;
+}
+.gemma[hidden] { display: none; }
+.gemma-head { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: var(--panel); border-bottom: 1px solid var(--rule); font-size: var(--fs-small); }
+.gemma-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); animation: feeds-watching 1.6s ease-out infinite; }
+.gemma-sub { color: var(--muted); }
+.gemma-model { font-family: var(--font-sign); color: var(--muted); }
+.gemma-log { list-style: none; margin: 0; padding: 8px 12px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; min-height: 0; flex: 1; }
+.gemma-task { border-left: 3px solid var(--rule); padding-left: 10px; font-size: var(--fs-small); animation: feed-open 180ms ease-out; }
+.gemma-task.is-running { border-color: var(--chase-1); }
+.gemma-task.is-crime { border-color: var(--alert); }
+.gemma-task.is-match { border-color: var(--ok); }
+.gemma-q { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+.gemma-spin { width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--rule); flex: none; }
+.gemma-task.is-running .gemma-spin { border-color: var(--chase-1) var(--rule) var(--rule); animation: spin .8s linear infinite; }
+.gemma-task.is-crime .gemma-spin { background: var(--alert); border-color: var(--alert); }
+.gemma-task.is-match .gemma-spin { background: var(--ok); border-color: var(--ok); }
+.gemma-think {
+  margin-top: 4px;
+  max-height: 120px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+.gemma-think:empty, .gemma-a:empty { display: none; }
+.gemma-task:not(.is-running) .gemma-think { display: none; }
+.gemma-a { margin-top: 4px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.gemma-task.is-running .gemma-a { font-family: var(--font-sign); color: var(--chase-1); }
+.gemma-task.is-crime .gemma-a { color: var(--alert); }
+.gemma-task.is-crime .gemma-a::first-letter { text-transform: uppercase; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* the camera Gemma is looking at right now */
+.cam.is-checking .cam-dot { border-color: var(--chase-1); animation: checking 1s ease-in-out infinite; }
+@keyframes checking { 50% { box-shadow: 0 0 0 8px color-mix(in srgb, var(--chase-1) 30%, transparent); } }
+/* the suspect just reached this camera */
+.cam.is-arrive .cam-dot { animation: arrive 1.2s ease-out 1; }
+@keyframes arrive {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--chase-1) 80%, transparent); }
+  100% { box-shadow: 0 0 0 22px transparent; }
+}
+/* the stretch of path that just lit up */
+.path-flash { animation: path-flash 1.4s ease-out forwards; filter: drop-shadow(0 0 6px #FFB020); }
+@keyframes path-flash { from { stroke-opacity: .9; } to { stroke-opacity: 0; } }
+
 .watch-tile { margin: 0; border: 1px solid var(--rule); border-radius: 8px; overflow: hidden; background: #000; }
 .watch-tile video { display: block; width: 100%; aspect-ratio: 16 / 9; max-height: 40vh; object-fit: contain; }
 .watch-tile figcaption { padding: 4px 8px; background: var(--panel); font-family: var(--font-sign); font-size: var(--fs-small); color: var(--muted); }

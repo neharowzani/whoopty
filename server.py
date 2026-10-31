@@ -1,4 +1,5 @@
-"""Serves the dashboard from web/ and runs the Gemma pipeline on POST /api/run."""
+"""Serves the dashboard from web/ and runs the Gemma pipeline: POST /api/run returns the result,
+GET /api/live streams every step (including Gemma's reasoning as it writes it) as server-sent events."""
 import json
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -14,6 +15,24 @@ class Handler(SimpleHTTPRequestHandler):
         # Always serve the latest page while we iterate.
         self.send_header("Cache-Control", "no-store")
         super().end_headers()
+
+    def do_GET(self):
+        if self.path != "/api/live":
+            return super().do_GET()
+        self.send_response(200)
+        self.send_header("Content-Type", "text/event-stream")
+        self.end_headers()
+
+        def send(step):
+            self.wfile.write(f"data: {json.dumps(step)}\n\n".encode())
+            self.wfile.flush()
+
+        try:
+            pipeline.run(send)
+        except BrokenPipeError:
+            pass  # the page was closed mid-run
+        except Exception as error:
+            send({"stage": "error", "message": str(error)})
 
     def do_POST(self):
         if self.path != "/api/run":
