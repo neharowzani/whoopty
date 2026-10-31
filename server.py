@@ -1,6 +1,7 @@
 """Serves the dashboard from web/ and runs the Gemma pipeline: POST /api/run returns the result,
 GET /api/live streams every step (including Gemma's reasoning as it writes it) as server-sent events."""
 import json
+import threading
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -23,9 +24,12 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_header("Content-Type", "text/event-stream")
         self.end_headers()
 
+        lock = threading.Lock()  # cameras 2 and 3 report from two threads at once
+
         def send(step):
-            self.wfile.write(f"data: {json.dumps(step)}\n\n".encode())
-            self.wfile.flush()
+            with lock:
+                self.wfile.write(f"data: {json.dumps(step)}\n\n".encode())
+                self.wfile.flush()
 
         try:
             pipeline.run(send)

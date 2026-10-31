@@ -13,30 +13,24 @@ const els = {
   live: document.getElementById("live"),
 };
 
-const PRIORITY = { high: "High priority", medium: "Medium priority", low: "Low priority" };
 const CHASE = "#FFB020";
-// While the next camera hasn't answered yet, the suspect's dot waits just short of it.
-const WAIT_AT = 0.92;
 
-let chase = null;     // cameras, events, suspect, dispatch: saved, or filling in during a live run
-let steps = [];       // crime first, then each camera that saw the suspect
-let revealed = 0;     // how many steps the chase has reached
-let shown = 0;        // which step's clip is on screen
-let decided = null;
+let chase = null;     // cameras, events, suspect: saved, or filling in while Gemma answers
+let steps = [];       // crime first, then each camera where Gemma found the suspect
+let revealed = 0;     // how many of those the chase has shown (only once the clip reaches that moment)
 let finished = false;
 let live = false;     // Gemma is still answering
 let markers = {};
-let path = null;      // lit: cameras where Gemma found the suspect
-let ahead = null;     // the stretch the dot is crossing (never drawn)
-let tracker = null;   // where the suspect is now
-let stepStart = 0;
-let timer = null;
+let path = null;
 let source = null;
-let run = 0;
+let run = 0;          // bumps on every new run, so an older run's loops stop
+let video = null;     // the clip on screen
+let onScreen = null;  // which camera it is
 
 const clock = (iso) => new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", second: "2-digit" });
 const camera = (id) => chase.cameras.find((c) => c.id === id);
 const escape = (s) => String(s ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]);
+const frame = () => new Promise((r) => setTimeout(r, 50));
 
 function setStatus(text, alert = false) {
   els.status.textContent = text;
@@ -53,182 +47,186 @@ function camIcon(cam, state = "") {
   });
 }
 
+// ---------- the card on the right ----------
+
+function buildCard() {
+  onScreen = null;
+  video = null;
+  els.card.innerHTML = `
+    <section class="feed is-watching">
+      <header class="feed-head">
+        <span class="feed-dot"></span>
+        <strong id="card-title">Watching</strong>
+        <span id="card-sub" class="feed-cam"></span>
+      </header>
+      <p id="card-suspect" class="feed-suspect" hidden></p>
+      <div id="card-video"></div>
+      <div class="feed-caption">
+        <button class="feed-nav" data-dir="-1" disabled aria-label="Previous camera">‹</button>
+        <span id="card-caption" class="feed-caption-text"></span>
+        <button class="feed-nav" data-dir="1" disabled aria-label="Next camera">›</button>
+      </div>
+      <ol id="card-steps" class="feed-steps"></ol>
+    </section>`;
+  els.card.querySelectorAll(".feed-nav").forEach((b) => (b.onclick = () => {
+    const i = steps.findIndex((s) => s.camera === onScreen) + Number(b.dataset.dir);
+    if (steps[i]) rewatch(i);
+  }));
+}
+
+function setHead(title, sub) {
+  els.card.querySelector("#card-title").textContent = title;
+  els.card.querySelector("#card-sub").textContent = sub;
+}
+
+function setCaption(text) {
+  els.card.querySelector("#card-caption").textContent = text;
+}
+
+function showClip(cam, { loop = false } = {}) {
+  onScreen = cam.id;
+  els.card.querySelector("#card-video").innerHTML = `<video class="feed-video" src="${cam.video}" autoplay muted playsinline ${loop ? "loop" : ""}></video>`;
+  video = els.card.querySelector("video");
+  video.started = performance.now();
+  return video;
+}
+
+// Where the clip is, in seconds. If the browser blocks autoplay, a clock stands in for it.
+function clipTime(v) {
+  if (v.currentTime > 0 || !v.paused) return v.currentTime;
+  return (performance.now() - v.started) / 1000;
+}
+
+function renderSteps() {
+  const box = els.card.querySelector("#card-steps");
+  box.innerHTML = steps.slice(0, revealed).map((s, i) => `
+    <li><button class="${s.camera === onScreen ? "now" : ""}" data-go="${i}" ${finished ? "" : "disabled"}>${i === 0 ? "Crime" : `Cam ${i + 1}`} ${clock(s.time)}</button></li>`).join("");
+  box.querySelectorAll("[data-go]").forEach((b) => (b.onclick = () => rewatch(Number(b.dataset.go))));
+  const at = steps.findIndex((s) => s.camera === onScreen);
+  const [prev, next] = els.card.querySelectorAll(".feed-nav");
+  prev.disabled = !finished || at <= 0;
+  next.disabled = !finished || at < 0 || at >= revealed - 1;
+}
+
+function rewatch(i) {
+  const s = steps[i];
+  showClip(camera(s.camera));
+  setCaption(`${camera(s.camera).name} · seen at ${clock(s.time)}`);
+  renderSteps();
+}
+
+// ---------- the chase ----------
+
 function setup(cameras) {
-  chase = { cameras, events: [], suspect: null, dispatch: null };
+  run++;
+  chase = { cameras, events: [], suspect: null };
   steps = [];
+  revealed = 0;
+  finished = false;
   Object.values(markers).forEach((m) => m.remove());
   markers = {};
-  [path, ahead, tracker].forEach((layer) => layer?.remove());
+  path?.remove();
   path = L.polyline([], { color: CHASE, weight: 5, lineCap: "round" }).addTo(map);
-  // Not drawn: the path only lights up once Gemma finds the suspect at the next camera.
-  ahead = L.polyline([], { opacity: 0 });
-  tracker = L.circleMarker([0, 0], { radius: 7, color: "#E6EDF2", weight: 2, fillColor: CHASE, fillOpacity: 1, interactive: false });
   for (const cam of cameras) markers[cam.id] = L.marker([cam.lat, cam.lng], { icon: camIcon(cam) }).addTo(map);
   // The cameras are ~20 m apart, so zoom in close enough to separate the pins.
   map.invalidateSize();
   map.setView(L.latLngBounds(cameras.map((c) => [c.lat, c.lng])).getCenter(), 20);
-  reset();
+  buildCard();
 }
 
-function reset() {
-  clearInterval(timer);
-  revealed = 0;
-  shown = 0;
-  decided = null;
-  finished = false;
-  path.setLatLngs([]);
-  ahead.setLatLngs([]);
-  tracker.remove();
-  for (const cam of chase.cameras) markers[cam.id].setIcon(camIcon(cam));
-  setStatus(`Watching ${chase.cameras.length} cameras`);
-  watching(`No open crimes. All ${chase.cameras.length} cameras are watching.`);
-}
-
-// Before a crime is found: one camera's clip at a time. Cycles through the cameras unless `only` is set.
-function watching(note, i = 0, only = null) {
-  const cam = only ? camera(only) : chase.cameras[i % chase.cameras.length];
-  els.card.innerHTML = `
-    <div class="feeds-calm"><span class="feeds-calm-dot"></span><span>${note}</span></div>
-    <figure class="watch-tile">
-      <video src="${cam.video}" autoplay muted playsinline ${only ? "loop" : ""}></video>
-      <figcaption>${cam.name}</figcaption>
-    </figure>`;
+// Nothing has happened: cycle through every camera's clip.
+async function idle() {
   const id = run;
-  els.card.querySelector("video").onended = () => { if (id === run && revealed === 0 && !only) watching(note, i + 1); };
+  setStatus(`Watching ${chase.cameras.length} cameras`);
+  for (let i = 0; id === run; i++) {
+    const cam = chase.cameras[i % chase.cameras.length];
+    setHead("Watching", `All ${chase.cameras.length} cameras`);
+    setCaption(cam.name);
+    const v = showClip(cam);
+    while (id === run && clipTime(v) < (cam.duration || 5)) await frame();
+  }
 }
 
-// Where the suspect's dot heads next: the next camera that saw them, or during a live run the next
-// camera Gemma hasn't answered for yet.
-function nextCamera() {
-  if (steps[revealed]) return camera(steps[revealed].camera);
+// The camera Gemma is still deciding on, which stays on screen (looping) until it answers.
+function pendingCamera(i) {
   if (!live) return null;
   const answered = new Set(chase.events.map((e) => e.camera));
-  return chase.cameras.find((c) => !answered.has(c.id)) ?? null;
+  return chase.cameras.find((c) => !answered.has(c.id)) ?? (i === 0 ? chase.cameras[0] : null);
 }
 
-// Moves the chase on a clock as long as each clip, so the map runs even if a browser blocks autoplay.
-function tick() {
-  const here = camera(steps[revealed - 1].camera);
-  const length = (here.duration || 5) * 1000;
-  const raw = (performance.now() - stepStart) / length;
-  const next = nextCamera();
-  if (next) {
-    const share = Math.min(raw, steps[revealed] ? 1 : WAIT_AT);
-    ahead.setLatLngs([[here.lat, here.lng], [next.lat, next.lng]]);
-    tracker.setLatLng([here.lat + (next.lat - here.lat) * share, here.lng + (next.lng - here.lng) * share]);
-  } else {
-    ahead.setLatLngs([]);
+// Waits until step i is known and its clip reaches the moment Gemma flagged. Returns false if there is none.
+async function reachStep(i, id) {
+  while (id === run) {
+    const step = steps[i];
+    if (!step) {
+      const cam = pendingCamera(i);
+      if (!cam) return false;
+      if (onScreen !== cam.id) {
+        showClip(cam, { loop: true });
+        setCaption(i === 0 ? `${cam.name} · Gemma 4 is checking for a crime…` : `${cam.name} · Gemma 4 is looking for the suspect…`);
+        setStatus(i === 0 ? `Gemma 4 is checking ${cam.name}…` : `Looking for the suspect on ${cam.name}…`, i > 0);
+      }
+      await frame();
+      continue;
+    }
+    const cam = camera(step.camera);
+    if (onScreen !== cam.id) showClip(cam);
+    // Gemma answered while this clip was already past the moment: back up to just before it.
+    if (clipTime(video) > step.offset_s + 0.3) {
+      video.currentTime = Math.max(step.offset_s - 2, 0);
+      video.started = performance.now() - video.currentTime * 1000;
+    }
+    while (id === run && clipTime(video) < step.offset_s) await frame();
+    video.loop = false;
+    return id === run;
   }
-  if (raw < 1) return;
-  if (steps[revealed]) reveal();
-  else if (!live) finish();
+  return false;
 }
 
-// The suspect reaches the next camera: that stretch of the path lights up, and the card switches to its clip.
-function reveal() {
-  const step = steps[revealed];
+// The clip just reached the moment Gemma flagged: the crime is called, or the suspect's path lights up.
+function detect(i) {
+  const step = steps[i];
   const cam = camera(step.camera);
-  revealed++;
-  markers[cam.id].setIcon(camIcon(cam, revealed === 1 ? "is-alert is-arrive" : "is-chase is-arrive"));
+  revealed = i + 1;
+  els.card.querySelector(".feed").classList.remove("is-watching");
+  setHead(steps[0].type, i === 0 ? "Crime camera" : `Camera ${i + 1}`);
+  const suspect = els.card.querySelector("#card-suspect");
+  suspect.textContent = `Suspect: ${chase.suspect}`;
+  suspect.hidden = false;
+  setCaption(`${cam.name} · seen at ${clock(step.time)}`);
+  markers[cam.id].setIcon(camIcon(cam, i === 0 ? "is-alert is-arrive" : "is-chase is-arrive"));
   const last = path.getLatLngs().at(-1);
   path.addLatLng([cam.lat, cam.lng]);
   if (last) {
     const flash = L.polyline([last, [cam.lat, cam.lng]], { color: CHASE, weight: 14, opacity: 0.9, lineCap: "round", className: "path-flash" }).addTo(map);
     setTimeout(() => flash.remove(), 1400);
   }
-  tracker.setLatLng([cam.lat, cam.lng]).addTo(map);
-  ahead.setLatLngs([]);
-  setStatus(revealed === 1 ? `${step.type} at ${cam.name}. Following suspect…` : `Suspect seen at ${cam.name}, ${clock(step.time)}`, true);
-  show(revealed - 1);
-  stepStart = performance.now();
-  clearInterval(timer);
-  timer = setInterval(tick, 50);
+  setStatus(i === 0 ? `${step.type[0].toUpperCase()}${step.type.slice(1)} at ${cam.name}. Following suspect…` : `Suspect seen at ${cam.name}, ${clock(step.time)}`, true);
+  renderSteps();
 }
 
-function show(i) {
-  shown = i;
-  render();
+async function follow() {
+  const id = run;
+  for (let i = 0; ; i++) {
+    if (!(await reachStep(i, id))) break;
+    detect(i);
+    const length = camera(steps[i].camera).duration || 5;
+    while (id === run && clipTime(video) < length) await frame();
+    if (id !== run) return;
+  }
+  if (!steps.length) {
+    if (id === run) setStatus("No crime found");
+    return;
+  }
+  if (id === run) finish();
 }
 
-function render() {
-  const step = steps[shown];
-  const cam = camera(step.camera);
-  const report = finished ? chase.dispatch : null;
-  const reportOpen = els.card.querySelector(".dispatch-report:not([hidden])") !== null || (report && !decided && !els.card.dataset.closed);
-
-  els.card.innerHTML = `
-    <section class="feed">
-      <header class="feed-head">
-        <span class="feed-dot"></span>
-        <strong>${steps[0].type}</strong>
-        <span class="feed-cam">${revealed === 1 ? "Crime camera" : `Camera ${revealed}`}</span>
-        <span class="feed-spacer"></span>
-        <button class="dispatch-btn${report ? " is-ready" : ""}${decided ? " is-decided" : ""}" ${report ? "" : "disabled"}>Dispatch report</button>
-      </header>
-      ${report ? `
-      <div class="dispatch-report" ${reportOpen ? "" : "hidden"}>
-        <header>
-          <span class="dispatch-priority is-${report.priority}">${PRIORITY[report.priority] ?? report.priority}</span>
-          <span class="dispatch-decide">
-            ${decided ? `<span class="dispatch-decided">${decided}</span>` : `
-              <button class="dispatch-confirm">Confirm</button>
-              <button class="dispatch-dismiss">Dismiss</button>`}
-            <button class="dispatch-close" aria-label="Close">×</button>
-          </span>
-        </header>
-        <p class="dispatch-action">${escape(report.recommendation)}</p>
-        <p class="dispatch-procedure">Procedure: ${escape(report.procedure)}</p>
-        <p class="dispatch-suspect">Suspect: ${escape(chase.suspect)}</p>
-      </div>` : ""}
-      <video class="feed-video" src="${cam.video}" autoplay muted playsinline></video>
-      <div class="feed-caption">
-        <button class="feed-nav" data-go="${shown - 1}" ${shown <= 0 ? "disabled" : ""} aria-label="Previous camera">‹</button>
-        <span class="feed-caption-text">${cam.name} · seen at ${clock(step.time)}</span>
-        <button class="feed-nav" data-go="${shown + 1}" ${shown >= revealed - 1 ? "disabled" : ""} aria-label="Next camera">›</button>
-      </div>
-      <ol class="feed-steps">
-        ${steps.slice(0, revealed).map((s, i) => `
-          <li><button class="${i === shown ? "now" : ""}" data-go="${i}">${i === 0 ? "Crime" : `Cam ${i + 1}`} ${clock(s.time)}</button></li>`).join("")}
-      </ol>
-    </section>`;
-
-  els.card.querySelectorAll("[data-go]").forEach((b) => (b.onclick = () => show(Number(b.dataset.go))));
-  els.card.querySelector(".dispatch-btn").onclick = () => {
-    const box = els.card.querySelector(".dispatch-report");
-    if (!box) return;
-    box.hidden = !box.hidden;
-    els.card.dataset.closed = box.hidden ? "1" : "";
-  };
-  els.card.querySelector(".dispatch-close")?.addEventListener("click", () => {
-    els.card.querySelector(".dispatch-report").hidden = true;
-    els.card.dataset.closed = "1";
-  });
-  els.card.querySelector(".dispatch-confirm")?.addEventListener("click", () => decide("Confirmed"));
-  els.card.querySelector(".dispatch-dismiss")?.addEventListener("click", () => decide("Dismissed"));
-}
-
-// The chase reached its last camera and Gemma has written the dispatch report.
 function finish() {
-  if (finished || !chase.dispatch) return;
-  clearInterval(timer);
+  if (finished) return;
   finished = true;
-  ahead.setLatLngs([]);
   const last = steps.at(-1);
-  setStatus(`Last seen at ${camera(last.camera).name}, ${clock(last.time)}. Needs your decision`, true);
-  const video = els.card.querySelector("video");
-  const t = video?.currentTime ?? 0;
-  delete els.card.dataset.closed;
-  render();
-  // Keep the clip where it was instead of restarting it.
-  const fresh = els.card.querySelector("video");
-  fresh.currentTime = t;
-  if (video?.ended) fresh.pause();
-}
-
-function decide(word) {
-  decided = word;
-  setStatus(`${word}. Last seen at ${camera(steps.at(-1).camera).name}`);
-  render();
+  setStatus(`Last seen at ${camera(last.camera).name}, ${clock(last.time)}`, true);
+  renderSteps();
 }
 
 function stopLive() {
@@ -238,35 +236,35 @@ function stopLive() {
   els.live.disabled = false;
 }
 
-function replay() {
+async function loadSaved() {
+  const data = await (await fetch("data/chase.json")).json();
+  setup(data.cameras);
+  return data;
+}
+
+async function replay() {
   stopLive();
-  run++;
   els.gemma.hidden = true;
-  delete els.card.dataset.closed;
-  fetch("data/chase.json")
-    .then((r) => r.json())
-    .then((data) => {
-      setup(data.cameras);
-      Object.assign(chase, data);
-      steps = data.events.filter((e) => e.kind !== "clear");
-      if (!steps.length) return setStatus("No crime found");
-      const id = run;
-      setTimeout(() => { if (id === run) reveal(); }, 800);
-    })
-    .catch(() => setStatus("No saved run yet. Click Run Gemma live."));
+  const data = await loadSaved();
+  Object.assign(chase, data);
+  steps = data.events.filter((e) => e.kind !== "clear");
+  follow();
 }
 
 // ---------- live: Gemma's steps stream in, and the chase follows its answers ----------
 
+function task(cameraId) {
+  return els.gemmaLog.querySelector(`[data-cam="${cameraId}"]`);
+}
+
 function addTask(step) {
-  const cam = step.camera ? camera(step.camera) : null;
+  const cam = camera(step.camera);
   els.gemmaModel.textContent = step.model;
-  els.gemmaLog.querySelector(".is-running")?.classList.remove("is-running");
   els.gemmaLog.insertAdjacentHTML("beforeend", `
-    <li class="gemma-task is-running">
+    <li class="gemma-task is-running" data-cam="${step.camera}">
       <div class="gemma-q">
         <span class="gemma-spin"></span>
-        <span>${cam ? `${cam.name} · ${step.frames} frames` : "Dispatch"} · ${step.question}</span>
+        <span>${cam.name} · ${step.frames} frames · ${step.question}</span>
       </div>
       <div class="gemma-think"></div>
       <div class="gemma-a"></div>
@@ -275,79 +273,65 @@ function addTask(step) {
 }
 
 function addText(step) {
-  const task = els.gemmaLog.querySelector(".is-running");
-  if (!task) return;
-  const box = task.querySelector(step.thought ? ".gemma-think" : ".gemma-a");
+  const box = task(step.camera)?.querySelector(step.thought ? ".gemma-think" : ".gemma-a");
+  if (!box) return;
   box.textContent += step.text;
   box.scrollTop = box.scrollHeight;
   els.gemmaLog.scrollTop = els.gemmaLog.scrollHeight;
 }
 
-function closeTask(kind, text) {
-  const task = els.gemmaLog.querySelector(".is-running");
-  if (!task) return;
-  task.classList.remove("is-running");
-  task.classList.add(`is-${kind}`);
-  task.querySelector(".gemma-a").textContent = text;
+function closeTask(cameraId, kind, text) {
+  const t = task(cameraId);
+  if (!t) return;
+  t.classList.remove("is-running");
+  t.classList.add(`is-${kind}`);
+  t.querySelector(".gemma-a").textContent = text;
 }
 
 function onStep(step) {
   if (step.stage === "cameras") {
-    setup(step.cameras);
-    setStatus("Gemma 4 is watching the cameras…");
+    // Already set up from the same cameras; just keep them current.
+    chase.cameras = step.cameras;
   } else if (step.stage === "asking") {
     addTask(step);
-    if (step.camera) {
-      document.querySelectorAll(".cam.is-checking").forEach((el) => el.classList.remove("is-checking"));
-      markers[step.camera].getElement()?.querySelector(".cam")?.classList.add("is-checking");
-      if (!revealed) watching(`Gemma 4 is checking ${camera(step.camera).name}…`, 0, step.camera);
-    }
   } else if (step.stage === "token") {
     addText(step);
   } else if (step.stage === "answer") {
     const e = step.event;
     chase.events.push(e);
     const cam = camera(e.camera);
-    markers[cam.id].getElement()?.querySelector(".cam")?.classList.remove("is-checking");
     if (e.kind === "clear") {
-      closeTask("clear", `No ${steps.length ? "match" : "crime"} at ${cam.name}.`);
-      markers[cam.id].setIcon(camIcon(cam, steps.some((s) => s.camera === cam.id) ? "is-chase" : ""));
-      return;
-    }
-    if (e.kind === "crime") {
+      closeTask(e.camera, "clear", `No ${e.camera === chase.cameras[0].id ? "crime" : "match"} at ${cam.name}.`);
+    } else if (e.kind === "crime") {
       chase.suspect = step.suspect;
-      closeTask("crime", `${e.type}: ${e.text} Suspect: ${step.suspect}.`);
+      closeTask(e.camera, "crime", `${e.type}: ${e.text} Suspect: ${step.suspect}.`);
+      steps.push(e);
     } else {
-      closeTask("match", `Suspect here at ${clock(e.time)}. ${e.text}`);
+      closeTask(e.camera, "match", `Suspect here at ${clock(e.time)}. ${e.text}`);
+      // Cameras answer in any order; the chase follows them in time order.
+      steps.push(e);
+      steps.sort((a, b) => a.time.localeCompare(b.time));
     }
-    steps.push(e);
-    if (e.kind === "crime") reveal();
-  } else if (step.stage === "dispatch") {
-    chase.dispatch = step.dispatch;
-    closeTask("match", `${PRIORITY[step.dispatch.priority] ?? step.dispatch.priority}. ${step.dispatch.recommendation}`);
   } else if (step.stage === "done") {
     stopLive();
     els.gemma.querySelector(".gemma-sub").textContent = "done";
-    if (!steps.length) setStatus("Gemma found no crime");
-    // If the chase already reached its last camera, it was only waiting on the dispatch report.
-    else if (revealed === steps.length && performance.now() - stepStart >= (camera(steps.at(-1).camera).duration || 5) * 1000) finish();
   } else if (step.stage === "error") {
     stopLive();
-    closeTask("clear", `Error: ${step.message}`);
+    els.gemmaLog.insertAdjacentHTML("beforeend", `<li class="gemma-task is-crime"><div class="gemma-a">Error: ${escape(step.message)}</div></li>`);
     setStatus(`Live run failed: ${step.message}`, true);
   }
 }
 
-function goLive() {
+async function goLive() {
   stopLive();
-  run++;
   live = true;
   els.live.disabled = true;
   els.gemma.hidden = false;
   els.gemma.querySelector(".gemma-sub").textContent = "thinking live";
   els.gemmaLog.innerHTML = "";
-  delete els.card.dataset.closed;
-  setStatus("Starting Gemma 4…");
+  await loadSaved(); // only for the camera positions and clips; every answer comes from Gemma now
+  live = true;
+  follow();
   source = new EventSource("/api/live");
   source.onmessage = (msg) => onStep(JSON.parse(msg.data));
   source.onerror = () => {
@@ -359,4 +343,4 @@ function goLive() {
 
 els.replay.onclick = replay;
 els.live.onclick = goLive;
-replay();
+loadSaved().then(idle).catch(() => setStatus("No cameras yet. Run pipeline.py once."));

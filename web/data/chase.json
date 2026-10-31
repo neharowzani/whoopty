@@ -4,11 +4,6 @@
     "gemma-4-26b-a4b-it"
   ],
   "suspect": "red and black striped shirt, blue jeans, slim build, dark hair",
-  "dispatch": {
-    "priority": "high",
-    "recommendation": "Send an officer to Camera 3 to intercept the suspect running left along the sidewalk.",
-    "procedure": "Approach with caution and attempt to detain the suspect."
-  },
   "cameras": [
     {
       "id": "cam1",

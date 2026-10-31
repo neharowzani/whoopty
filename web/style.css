@@ -212,9 +212,6 @@ button:disabled { opacity: 0.5; cursor: default; }
 .gemma-task.is-crime .gemma-a::first-letter { text-transform: uppercase; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* the camera Gemma is looking at right now */
-.cam.is-checking .cam-dot { border-color: var(--chase-1); animation: checking 1s ease-in-out infinite; }
-@keyframes checking { 50% { box-shadow: 0 0 0 8px color-mix(in srgb, var(--chase-1) 30%, transparent); } }
 /* the suspect just reached this camera */
 .cam.is-arrive .cam-dot { animation: arrive 1.2s ease-out 1; }
 @keyframes arrive {
@@ -254,36 +251,12 @@ button:disabled { opacity: 0.5; cursor: default; }
 .feed-head strong { color: var(--c); text-transform: capitalize; }
 .feed-cam { color: var(--muted); }
 .feed-spacer { flex: 1; }
-.dispatch-btn { font-size: 12px; padding: 2px 8px; color: var(--muted); opacity: 0.45; }
-.dispatch-btn.is-ready { opacity: 1; color: #000; background: var(--c); border-color: var(--c); animation: dispatch-ready 1.6s ease-out infinite; }
-.dispatch-btn.is-decided { animation: none; }
-@keyframes dispatch-ready {
-  0% { box-shadow: 0 0 0 0 var(--c); }
-  100% { box-shadow: 0 0 0 10px transparent; }
-}
-
-.dispatch-report {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin: 0 8px 8px;
-  padding: 12px 14px;
-  background: rgba(14, 26, 36, 0.96);
-  border: 2px solid var(--c);
-  border-radius: 8px;
-}
-.dispatch-report[hidden] { display: none; }
-.dispatch-report header { display: flex; align-items: center; justify-content: space-between; }
-.dispatch-priority { font-weight: 700; font-size: var(--fs-small); padding: 2px 8px; border-radius: 999px; background: var(--rule); color: var(--text); }
-.dispatch-priority.is-high { background: var(--alert); color: var(--ink); }
-.dispatch-decide { display: flex; align-items: center; gap: 6px; }
-.dispatch-confirm, .dispatch-dismiss { font-size: var(--fs-small); padding: 3px 12px; border-radius: 6px; }
-.dispatch-confirm { background: var(--ok); color: var(--ink); border-color: var(--ok); font-weight: 700; }
-.dispatch-dismiss { color: var(--muted); }
-.dispatch-close { border: 0; font-size: 18px; padding: 0 4px; }
-.dispatch-decided { color: var(--ok); font-weight: 600; font-size: var(--fs-small); }
-.dispatch-action { margin: 0; font-size: 16px; font-weight: 600; }
-.dispatch-procedure, .dispatch-suspect { margin: 0; font-size: var(--fs-small); color: var(--muted); }
+/* Before a crime: a quiet grey card. It turns amber only when Gemma's crime call fires. */
+.feed.is-watching { --c: var(--rule); box-shadow: none; }
+.feed.is-watching .feed-dot { background: var(--ok); animation: feeds-watching 2.4s ease-out infinite; }
+.feed.is-watching .feed-head strong { color: var(--text); }
+.feed-suspect { margin: 0; padding: 0 12px 10px; background: var(--panel); color: var(--text); font-size: var(--fs-small); }
+.feed-suspect[hidden] { display: none; }
 
 .feed-video { display: block; width: 100%; aspect-ratio: 16 / 9; max-height: 40vh; object-fit: contain; background: #000; }
 .feed-caption {

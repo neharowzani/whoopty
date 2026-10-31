@@ -4,13 +4,16 @@ import json
 import os
 import subprocess
 import tempfile
+import time
+import urllib.error
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
 from pathlib import Path
 
 ROOT = Path(__file__).parent
 MODEL = "gemma-4-31b-it"  # spotting the crime: the smaller model missed it in testing
-FAST_MODEL = "gemma-4-26b-a4b-it"  # matching and dispatch: ~4 s per call instead of ~20 s
+FAST_MODEL = "gemma-4-26b-a4b-it"  # matching the suspect: ~3 s per call instead of ~20 s
 FPS = 2
 
 CAMERAS = [
@@ -29,11 +32,6 @@ Suspect: {suspect}
 Is the suspect in these frames? Match on clothing and build.
 Reply as JSON: {{"match": bool, "confidence": 0 to 1, "frame": number of the frame where the suspect is clearest, "what_they_did": one sentence, "direction": which way they left the frame}}"""
 
-DISPATCH_PROMPT = """You are a police dispatcher. A person reviews your report before anyone is sent.
-What the cameras saw, in time order:
-{timeline}
-Suspect: {suspect}
-Reply as JSON: {{"priority": "low|medium|high", "recommendation": one sentence saying where to send an officer (where the suspect was last seen, not the crime scene), "procedure": one short sentence of steps for the officer}}"""
 
 
 def load_key() -> str:
@@ -83,8 +81,17 @@ def ask_gemma(images: list[bytes], prompt: str, model: str = MODEL, on_text=lamb
         data=json.dumps(body).encode(),
         headers={"Content-Type": "application/json", "x-goog-api-key": load_key()},
     )
+    for attempt in range(4):
+        try:
+            response = urllib.request.urlopen(request, timeout=180)
+            break
+        except urllib.error.HTTPError as error:
+            # Google rate-limits bursts of Gemma calls; wait and retry.
+            if error.code != 429 or attempt == 3:
+                raise
+            time.sleep(2 * (attempt + 1))
     thought, answer = [], []
-    for line in urllib.request.urlopen(request, timeout=180):
+    for line in response:
         line = line.decode().strip()
         if not line.startswith("data:"):
             continue
@@ -127,31 +134,24 @@ def run(on_step=lambda step: None) -> dict:
 
     if spot["crime"]:
         prompt = MATCH_PROMPT.format(gap=1 / FPS, suspect=spot["suspect"])
-        for camera in rest:
+        def check(camera):
             images = frames(ROOT / camera["source"])
             on_step({"stage": "asking", "camera": camera["id"], "model": FAST_MODEL, "frames": len(images), "question": "Is the suspect here?"})
             match, thought = ask_gemma(images, prompt, FAST_MODEL, stream(camera["id"]))
-            events.append(event(camera, infos[camera["id"]], match.get("frame") or 1,
-                                kind="sighting" if match["match"] else "clear", confidence=match.get("confidence"),
-                                text=match.get("what_they_did"), direction=match.get("direction")))
-            on_step({"stage": "answer", "camera": camera["id"], "thought": thought, "event": events[-1]})
+            found = event(camera, infos[camera["id"]], match.get("frame") or 1,
+                          kind="sighting" if match["match"] else "clear", confidence=match.get("confidence"),
+                          text=match.get("what_they_did"), direction=match.get("direction"))
+            on_step({"stage": "answer", "camera": camera["id"], "thought": thought, "event": found})
+            return found
+
+        # The other cameras are checked at the same time.
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            events += list(pool.map(check, rest))
 
     events.sort(key=lambda e: e["time"])
-    dispatch = None
-    if spot["crime"]:
-        names = {c["id"]: c["name"] for c in CAMERAS}
-        timeline = "\n".join(
-            f"- {datetime.fromisoformat(e['time']):%I:%M:%S %p} at {names[e['camera']]}: {e['kind']}. {e['text']} Left heading {e['direction']}."
-            for e in events if e["kind"] != "clear"
-        )
-        on_step({"stage": "asking", "camera": None, "model": FAST_MODEL, "frames": 0, "question": "Where should an officer go?"})
-        dispatch, thought = ask_gemma([], DISPATCH_PROMPT.format(timeline=timeline, suspect=spot["suspect"]), FAST_MODEL, stream(None))
-        on_step({"stage": "dispatch", "thought": thought, "dispatch": dispatch})
-
     result = {
         "models": [MODEL, FAST_MODEL],
         "suspect": spot.get("suspect") if spot["crime"] else None,
-        "dispatch": dispatch,
         "cameras": cameras,
         "events": events,
     }
