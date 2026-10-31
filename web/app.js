@@ -134,17 +134,17 @@ function setup(cameras) {
   buildCard();
 }
 
-// Nothing has happened: cycle through every camera's clip.
-async function idle() {
-  const id = run;
-  setStatus(`Watching ${chase.cameras.length} cameras`);
-  for (let i = 0; id === run; i++) {
-    const cam = chase.cameras[i % chase.cameras.length];
-    setHead("Watching", `All ${chase.cameras.length} cameras`);
-    setCaption(cam.name);
-    const v = showClip(cam);
-    while (id === run && clipTime(v) < (cam.duration || 5)) await frame();
-  }
+// Before Play: camera 1 sits paused on its first frame, with a play button over it.
+function ready() {
+  setStatus(`${chase.cameras.length} cameras ready`);
+  setHead("Ready", `${chase.cameras.length} cameras`);
+  setCaption("Press play to start Gemma 4");
+  const cam = chase.cameras[0];
+  onScreen = cam.id;
+  els.card.querySelector("#card-video").innerHTML = `
+    <video class="feed-video" src="${cam.video}#t=0.1" muted playsinline preload="metadata"></video>
+    <button class="play-overlay" aria-label="Play">▶</button>`;
+  els.card.querySelector(".play-overlay").onclick = goLive;
 }
 
 // The camera Gemma is still deciding on, which stays on screen (looping) until it answers.
@@ -343,4 +343,4 @@ async function goLive() {
 
 els.replay.onclick = replay;
 els.live.onclick = goLive;
-loadSaved().then(idle).catch(() => setStatus("No cameras yet. Run pipeline.py once."));
+loadSaved().then(ready).catch(() => setStatus("No cameras yet. Run pipeline.py once."));

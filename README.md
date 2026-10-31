@@ -6,7 +6,7 @@ Gemma 4 watches street cameras, spots a crime on one, describes the suspect, the
 
 1. Put `GEMINI_API_KEY=...` in `.env` (a key from a billed Google AI Studio project).
 2. `python3 server.py` and open http://localhost:8000
-3. The page watches the cameras. **Run Gemma live** asks Gemma 4 about every camera (~35 s) and streams its reasoning into the page. The crime is called only when Gemma has answered and the clip reaches that moment; each camera and stretch of path lights up only when Gemma finds the suspect there. **Replay chase** plays the last saved run the same way (backup if the network is down).
+3. The page loads paused. **▶ Play** starts the clips and asks Gemma 4 about every camera (~35 s) and streams its reasoning into the page. The crime is called only when Gemma has answered and the clip reaches that moment; each camera and stretch of path lights up only when Gemma finds the suspect there. **Replay chase** plays the last saved run the same way (backup if the network is down).
 
 `python3 pipeline.py` runs Gemma from the terminal and rewrites `web/data/chase.json`.
 

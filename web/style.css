@@ -310,3 +310,20 @@ button:disabled { opacity: 0.5; cursor: default; }
   .header { flex-wrap: wrap; padding: 8px 16px; height: auto; }
   .header-site { display: none; }
 }
+
+/* Before Play: one big button over the paused first camera. */
+#card-video { position: relative; }
+.play-overlay {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 72px;
+  height: 72px;
+  padding: 0 0 0 6px;
+  border-radius: 50%;
+  border: 2px solid var(--text);
+  background: color-mix(in srgb, var(--ink) 70%, transparent);
+  color: var(--text);
+  font-size: 28px;
+}
+.play-overlay:hover { background: var(--text); color: var(--ink); }
